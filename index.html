@@ -471,8 +471,11 @@ button:hover {
 </div>
 
 <script>
+// 存储键
 const STORAGE_KEY = 'todo_calendar_data';
 const COMPLETE_TIME_KEY = 'todo_complete_time';
+const TAGS_STORAGE_KEY = 'todo_tags';  // 新增：用于保存待办任务签
+
 let currentTodo = '';
 let currentDate = getTodayDate();
 
@@ -502,7 +505,7 @@ function saveCompleteTimeData(data) {
 }
 
 // ======================
-// 标签输入 + 随机颜色 + 批量新增（空格、逗号、斜杠分割）
+// 标签输入 + 随机颜色 + 批量新增 + 本地缓存
 // ======================
 const wrapper = document.getElementById('todoInputWrapper');
 const newInput = document.getElementById('newTodoInput');
@@ -516,6 +519,26 @@ const colorPalette = [
 
 function getRandomColor() {
   return colorPalette[Math.floor(Math.random() * colorPalette.length)];
+}
+
+// 保存待办任务到 localStorage
+function saveTagsToStorage() {
+  localStorage.setItem(TAGS_STORAGE_KEY, JSON.stringify(tagItems));
+}
+
+// 从 localStorage 加载待办任务
+function loadTagsFromStorage() {
+  const saved = localStorage.getItem(TAGS_STORAGE_KEY);
+  if (saved) {
+    try {
+      tagItems = JSON.parse(saved);
+    } catch (e) {
+      tagItems = [];
+    }
+  } else {
+    tagItems = [];
+  }
+  renderTags();
 }
 
 function renderTags() {
@@ -537,6 +560,7 @@ function renderTags() {
       const idx = parseInt(el.dataset.idx);
       tagItems.splice(idx, 1);
       renderTags();
+      saveTagsToStorage(); // 删除后保存
     };
   });
 }
@@ -560,6 +584,7 @@ function addBatchTasks(inputText) {
     }
   }
   renderTags();
+  saveTagsToStorage(); // 添加后保存
 }
 
 // 回车事件
@@ -577,6 +602,7 @@ function getTodoArray() {
 function removeTodo(text) {
   tagItems = tagItems.filter(item => item.text !== text);
   renderTags();
+  saveTagsToStorage(); // 移除后保存
 }
 
 // ======================
@@ -613,6 +639,7 @@ document.getElementById('drawBtn').addEventListener('click', () => {
 document.getElementById('clearBtn').addEventListener('click', () => {
   tagItems = [];
   renderTags();
+  saveTagsToStorage(); // 清空后保存
   hideDrawStick();
   emptyTip.textContent = '抽签结果将显示在这里';
   currentTodo = '';
@@ -638,7 +665,7 @@ document.getElementById('completeBtn').addEventListener('click', () => {
   }
   saveCompleteTimeData(timeData);
 
-  removeTodo(taskName);
+  removeTodo(taskName); // 内部会保存
   hideDrawStick();
   emptyTip.textContent = '已完成并移除该签，可继续抽签';
   currentTodo = '';
@@ -755,7 +782,7 @@ function showRecord(date) {
 }
 
 window.onload = () => {
-  renderTags();
+  loadTagsFromStorage();  // 先加载保存的待办任务
   renderCalendar();
   showRecord(currentDate);
 };
