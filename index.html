@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>A娃你就抽签吧</title>
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Microsoft Yahei", sans-serif;
+}
+body {
+  background: #f5f7fa;
+  padding: 20px;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.main-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.2fr;
+  gap: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+}
+@media (max-width: 900px) {
+  .main-container {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+}
+.card {
+  background: #fff;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+h2 {
+  font-size: 20px;
+  margin-bottom: 12px;
+  color: #333;
+  text-align: center;
+  flex-shrink: 0;
+}
+.tips {
+  color: #666;
+  font-size: 14px;
+  margin-bottom: 8px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* 左栏：抽签筒 - 新颜色 #EACAA0 */
+.bucket-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: 12px;
+}
+
+/* 输入框区域 - 没有按钮，只有输入框 */
+.input-above-bucket {
+  flex-shrink: 0;
+  display: flex;
+  width: 100%;
+}
+.input-above-bucket input {
+  flex: 1;
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  padding: 12px 12px;
+  font-size: 14px;
+  background: #fff;
+  transition: 0.2s;
+}
+.input-above-bucket input:focus {
+  outline: none;
+  border-color: #409eff;
+  box-shadow: 0 0 0 2px rgba(64,158,255,0.2);
+}
+
+.bucket {
+  flex: 1;
+  background: #EACAA0;  /* 新颜色 - 抽签筒底色 */
+  border-radius: 12px 12px 8px 8px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: inset 0 0 20px rgba(0,0,0,0.15);
+  padding: 15px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.bucket::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 20px;
+  background: linear-gradient(90deg, #d6b187 0%, #EACAA0 50%, #d6b187 100%);
+  border-radius: 8px 8px 0 0;
+  z-index: 1;
+}
+
+#todoInputWrapper {
+  flex: 1;
+  overflow-y: auto;
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+  position: relative;
+  z-index: 2;
+  min-height: 0;
+}
+
+/* 标签样式 - 随机颜色将动态应用 */
+.todo-tag {
+  background: #ffffffdd;
+  border-radius: 12px;
+  padding: 8px 12px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  border-left-width: 4px;
+  border-left-style: solid;
+  animation: fadeIn 0.2s ease;
+  flex-shrink: 0;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.todo-tag-text {
+  flex: 1;
+  word-break: break-word;
+}
+.todo-tag-remove {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ff4d4f;
+  color: #fff;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+/* 中间操作区 - 新配色按钮 */
+.draw-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+.btn-group {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  width: 100%;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+button {
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 16px;
+  flex: 1;
+  color: #fff;
+}
+button:hover {
+  opacity: 0.9;
+  transform: translateY(-2px);
+}
+/* 开始抽签 - 新颜色 #F4BAC5 */
+#drawBtn {
+  background: #F4BAC5;
+}
+/* 清空签筒 - 新颜色 #6EB4CC */
+.btn-clear {
+  background: #6EB4CC !important;
+}
+/* 完成 - 新颜色 #3371AE */
+.btn-complete {
+  background: #3371AE !important;
+}
+/* 导出按钮保持原样 */
+.btn-export {
+  background: #f56c6c;
+  margin-left: auto;
+  margin-top: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  line-height: 1.2;
+  flex: 0 1 auto;
+  width: fit-content;
+  align-self: flex-end;
+  border-radius: 6px;
+}
+
+.result-container {
+  width: 100%;
+  height: 200px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #f8f9fa;
+  border: 2px dashed #ddd;
+  flex-shrink: 0;
+}
+.draw-stick {
+  position: absolute;
+  bottom: -100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80%;
+  height: 160px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 15px;
+  font-size: 18px;
+  color: #333;
+  transition: all 0.8s cubic-bezier(0.17, 0.89, 0.32, 1.28);
+}
+.draw-stick.active {
+  bottom: 20px;
+}
+.empty-tip {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #999;
+  font-size: 16px;
+}
+
+/* ========= 右侧日历区 - 完全保持原样，未作任何修改 ========= */
+.calendar-head {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 2px;
+  flex-shrink: 0;
+}
+.calendar-head span {
+  text-align: center;
+  font-weight: 400;
+  color: #888;
+  font-size: 10px;
+  padding: 2px 0;
+}
+
+.calendar-box {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-top: 0;
+  flex-shrink: 0;
+}
+
+/* 宽扁格子：宽/高 = 2.5 */
+.calendar-day {
+  width: 100%;
+  padding-bottom: 40%; /* 高度 = 宽度的0.4倍 (宽=2.5倍高) */
+  height: 0;
+  position: relative;
+  background: transparent;
+  cursor: pointer;
+  font-size: 10px;
+  color: #333;
+  transition: 0.1s;
+  border: none;
+}
+.calendar-day span {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  line-height: 1;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.calendar-day:hover {
+  background: #f0f0f0;
+  border-radius: 3px;
+}
+.calendar-day.active {
+  background: #e6f7ff;
+  color: #1890ff;
+  font-weight: 500;
+  border-radius: 3px;
+}
+.calendar-day.has-todo {
+  font-weight: 500;
+  color: #2c7a4d;
+}
+.calendar-day.has-todo::after {
+  content: "";
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  background: #52c41a;
+  border-radius: 50%;
+}
+
+/* 右侧其他元素 */
+.record-box {
+  margin-top: 8px;
+  padding: 6px 0;
+  border-top: 1px solid #eee;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.record-box h4 {
+  flex-shrink: 0;
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: #555;
+  font-weight: 400;
+}
+.record-list {
+  flex: 1;
+  overflow-y: auto;
+  margin-top: 2px;
+  padding-right: 2px;
+}
+.record-item {
+  padding: 3px 0;
+  font-size: 11px;
+  color: #444;
+}
+.record-item small {
+  color: #999;
+  font-size: 9px;
+  margin-left: 4px;
+}
+
+.date-picker {
+  padding: 3px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin-right: 4px;
+  font-size: 11px;
+  width: 120px;
+  background: transparent;
+}
+#jumpDate {
+  padding: 3px 8px;
+  font-size: 11px;
+  background: #f0f0f0;
+  color: #333;
+  border: none;
+  border-radius: 4px;
+}
+.export-range {
+  display: flex;
+  gap: 2px;
+  margin-top: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  font-size: 11px;
+}
+.export-range input {
+  padding: 2px;
+  border-radius: 3px;
+  border: 1px solid #ddd;
+  font-size: 9px;
+  width: 90px;
+  background: transparent;
+}
+/* 固定头部不压缩 */
+.card > div:not(.bucket-container):not(.draw-area) {
+  flex-shrink: 0;
+}
+</style>
+</head>
+<body>
+
+<div class="main-container">
+  <!-- 左栏：抽签筒 + 批量新增(无按钮) - 新配色 -->
+  <div class="card">
+    <h2>🎋 抽签筒</h2>
+    <p class="tips">enter新增，空格、，、/分开可批量新增</p>
+    <div class="bucket-container">
+      <div class="input-above-bucket">
+        <input type="text" id="newTodoInput" placeholder="输入任务，回车批量添加" />
+      </div>
+      <div class="bucket">
+        <div id="todoInputWrapper"></div>
+        <input id="todoRealInput" style="display: none;" />
+      </div>
+    </div>
+  </div>
+
+  <!-- 中栏：抽签 - 新配色按钮 -->
+  <div class="card">
+    <h2>🔮 就你，过来抽个签</h2>
+    <div class="draw-area">
+      <div class="btn-group">
+        <button id="drawBtn">开始抽签</button>
+        <button class="btn-clear" id="clearBtn">清空签筒</button>
+        <button class="btn-complete" id="completeBtn">完成</button>
+      </div>
+      
+      <div class="result-container">
+        <div class="draw-stick" id="drawStick"></div>
+        <div class="empty-tip" id="emptyTip">抽签结果将显示在这里</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 右栏：日历 - 完全保持原样 -->
+  <div class="card">
+    <h2>🙀 做了这么多，蒸蚌！</h2>
+    <div style="display: flex; margin-bottom: 4px; flex-shrink:0; align-items: center;">
+      <input type="date" id="datePicker" class="date-picker">
+      <button id="jumpDate">跳转</button>
+    </div>
+    <div class="calendar-head">
+      <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+    </div>
+    <div class="calendar-box" id="calendarBox"></div>
+
+    <div class="export-range">
+      <span>导出：</span>
+      <input type="date" id="exportStart">
+      <span>~</span>
+      <input type="date" id="exportEnd">
+    </div>
+    <button class="btn-export" id="exportBtn">导出已办事项</button>
+
+    <div class="record-box">
+      <h4>当日完成明细</h4>
+      <div class="record-list" id="recordList">请选择日期查看</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'todo_calendar_data';
+const COMPLETE_TIME_KEY = 'todo_complete_time';
+let currentTodo = '';
+let currentDate = getTodayDate();
+
+function getTodayDate() {
+  const d = new Date();
+  return d.toISOString().split('T')[0];
+}
+
+function getCurrentTime() {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
+}
+
+function getData() {
+  const data = localStorage.getItem(STORAGE_KEY);
+  return data ? JSON.parse(data) : {};
+}
+function saveData(data) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+function getCompleteTimeData() {
+  const data = localStorage.getItem(COMPLETE_TIME_KEY);
+  return data ? JSON.parse(data) : {};
+}
+function saveCompleteTimeData(data) {
+  localStorage.setItem(COMPLETE_TIME_KEY, JSON.stringify(data));
+}
+
+// ======================
+// 标签输入 + 随机颜色 + 批量新增（空格、逗号、斜杠分割）
+// ======================
+const wrapper = document.getElementById('todoInputWrapper');
+const newInput = document.getElementById('newTodoInput');
+
+let tagItems = []; // 每个元素: { text: string, color: string }
+
+// 低饱和度颜色池
+const colorPalette = [
+  '#f8d7da', '#ffe0b2', '#fff9c4', '#d4edda', '#d1ecf1', '#d0e0ff', '#e1d5f2'
+];
+
+function getRandomColor() {
+  return colorPalette[Math.floor(Math.random() * colorPalette.length)];
+}
+
+function renderTags() {
+  wrapper.innerHTML = '';
+  tagItems.forEach((item, idx) => {
+    const div = document.createElement('div');
+    div.className = 'todo-tag';
+    div.style.backgroundColor = item.color;
+    div.style.borderLeftColor = '#409eff';
+    div.innerHTML = `
+      <div class="todo-tag-text">${item.text}</div>
+      <div class="todo-tag-remove" data-idx="${idx}">×</div>
+    `;
+    wrapper.appendChild(div);
+  });
+
+  document.querySelectorAll('.todo-tag-remove').forEach(el => {
+    el.onclick = () => {
+      const idx = parseInt(el.dataset.idx);
+      tagItems.splice(idx, 1);
+      renderTags();
+    };
+  });
+}
+
+// 批量添加任务：以空格、逗号、斜杠分割
+function addBatchTasks(inputText) {
+  const raw = inputText.trim();
+  if (raw === '') return;
+  
+  // 使用正则分割：空格、英文逗号、中文逗号、斜杠
+  // 支持多种分隔符混合
+  const parts = raw.split(/[ ,，/]+/).filter(p => p.trim() !== '');
+  
+  for (let part of parts) {
+    const task = part.trim();
+    if (task) {
+      tagItems.push({
+        text: task,
+        color: getRandomColor()
+      });
+    }
+  }
+  renderTags();
+}
+
+// 回车事件
+newInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    addBatchTasks(newInput.value);
+    newInput.value = ''; // 清空输入框
+  }
+});
+
+function getTodoArray() {
+  return tagItems.map(item => item.text);
+}
+function removeTodo(text) {
+  tagItems = tagItems.filter(item => item.text !== text);
+  renderTags();
+}
+
+// ======================
+// 抽签动画
+// ======================
+const drawStick = document.getElementById('drawStick');
+const emptyTip = document.getElementById('emptyTip');
+const datePicker = document.getElementById('datePicker');
+datePicker.value = currentDate;
+
+function showDrawAnimation(text) {
+  emptyTip.style.display = 'none';
+  drawStick.textContent = text;
+  drawStick.classList.add('active');
+}
+function hideDrawStick() {
+  drawStick.classList.remove('active');
+  emptyTip.style.display = 'block';
+}
+
+document.getElementById('drawBtn').addEventListener('click', () => {
+  const list = getTodoArray();
+  if (!list.length) {
+    hideDrawStick();
+    emptyTip.textContent = '签桶已空！';
+    currentTodo = '';
+    return;
+  }
+  const idx = Math.floor(Math.random() * list.length);
+  currentTodo = list[idx];
+  showDrawAnimation(`✅ 抽中：${currentTodo}`);
+});
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+  tagItems = [];
+  renderTags();
+  hideDrawStick();
+  emptyTip.textContent = '抽签结果将显示在这里';
+  currentTodo = '';
+});
+
+document.getElementById('completeBtn').addEventListener('click', () => {
+  if (!currentTodo) {
+    alert('请先抽取一个待办！');
+    return;
+  }
+  const taskName = currentTodo.replace('✅ 抽中：', '');
+  const completeTime = getCurrentTime();
+
+  const data = getData();
+  if (!data[currentDate]) data[currentDate] = [];
+  data[currentDate].push(taskName);
+  saveData(data);
+
+  const timeData = getCompleteTimeData();
+  if (!timeData[currentDate]) timeData[currentDate] = {};
+  if (!timeData[currentDate][taskName]) {
+    timeData[currentDate][taskName] = completeTime;
+  }
+  saveCompleteTimeData(timeData);
+
+  removeTodo(taskName);
+  hideDrawStick();
+  emptyTip.textContent = '已完成并移除该签，可继续抽签';
+  currentTodo = '';
+  renderCalendar();
+  showRecord(currentDate);
+});
+
+// ======================
+// 导出
+// ======================
+document.getElementById('exportBtn').addEventListener('click', () => {
+  const start = document.getElementById('exportStart').value;
+  const end = document.getElementById('exportEnd').value;
+  const todoData = getData();
+  const timeData = getCompleteTimeData();
+
+  if (Object.keys(todoData).length === 0) {
+    alert('暂无已完成事项可导出！');
+    return;
+  }
+
+  const dates = Object.keys(todoData).sort();
+  let filteredDates = dates;
+  if (start && end) {
+    filteredDates = dates.filter(d => d >= start && d <= end);
+  }
+  if (filteredDates.length === 0) {
+    alert('该时间段内无数据');
+    return;
+  }
+
+  let csv = '日期,时间,任务\n';
+  filteredDates.forEach(date => {
+    const tasks = todoData[date] || [];
+    tasks.forEach(task => {
+      const t = timeData[date]?.[task] || '未知时间';
+      const safe = task.replace(/,/g, '，');
+      csv += `${date},${t},${safe}\n`;
+    });
+  });
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const suffix = (start && end) ? `_${start}_to_${end}` : '_全部';
+  a.download = `已办事项${suffix}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  alert('导出成功！可用 Excel 打开');
+});
+
+// ======================
+// 日历渲染 (完全保持原样)
+// ======================
+document.getElementById('jumpDate').addEventListener('click', () => {
+  if (datePicker.value) {
+    currentDate = datePicker.value;
+    renderCalendar();
+    showRecord(currentDate);
+  }
+});
+
+function renderCalendar() {
+  const box = document.getElementById('calendarBox');
+  box.innerHTML = '';
+  const [y, m] = currentDate.split('-').map(Number);
+  const firstDay = new Date(y, m - 1, 1);
+  const lastDay = new Date(y, m, 0);
+  const startWeek = firstDay.getDay() || 7; // 周一=1,周日=7
+
+  for (let i = 1; i < startWeek; i++) {
+    const emptyDiv = document.createElement('div');
+    emptyDiv.classList.add('calendar-day');
+    emptyDiv.style.background = 'transparent';
+    emptyDiv.style.cursor = 'default';
+    box.appendChild(emptyDiv);
+  }
+
+  const data = getData();
+  for (let d = 1; d <= lastDay.getDate(); d++) {
+    const dateStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const el = document.createElement('div');
+    el.className = 'calendar-day';
+    const span = document.createElement('span');
+    span.textContent = d;
+    el.appendChild(span);
+    
+    if (dateStr === currentDate) el.classList.add('active');
+    if (data[dateStr]?.length) el.classList.add('has-todo');
+    el.onclick = () => {
+      currentDate = dateStr;
+      datePicker.value = dateStr;
+      renderCalendar();
+      showRecord(dateStr);
+    };
+    box.appendChild(el);
+  }
+}
+
+function showRecord(date) {
+  const listEl = document.getElementById('recordList');
+  const list = getData()[date] || [];
+  const timeData = getCompleteTimeData()[date] || {};
+  if (list.length === 0) {
+    listEl.innerHTML = '当天暂无完成事项';
+    return;
+  }
+  listEl.innerHTML = list.map((item, i) =>
+    `<div class="record-item">${i+1}. ${item} <small>(${timeData[item] || '未知时间'})</small></div>`
+  ).join('');
+}
+
+window.onload = () => {
+  renderTags();
+  renderCalendar();
+  showRecord(currentDate);
+};
+</script>
+</body>
+</html>
