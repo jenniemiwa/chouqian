@@ -199,13 +199,13 @@ button:hover {
 #drawBtn {
   background: #F4BAC5;
 }
+/* 循签蹈矩 (原完成按钮) - 新颜色 #3371AE */
+.btn-complete {
+  background: #3371AE !important;
+}
 /* 清空签筒 - 新颜色 #6EB4CC */
 .btn-clear {
   background: #6EB4CC !important;
-}
-/* 完成 - 新颜色 #3371AE */
-.btn-complete {
-  background: #3371AE !important;
 }
 /* 导出按钮保持原样 */
 .btn-export {
@@ -426,14 +426,14 @@ button:hover {
     </div>
   </div>
 
-  <!-- 中栏：抽签 - 新配色按钮 -->
+  <!-- 中栏：抽签 - 新配色按钮（按钮顺序已交换） -->
   <div class="card">
     <h2>🔮 就你，过来抽个签</h2>
     <div class="draw-area">
       <div class="btn-group">
         <button id="drawBtn">开始抽签</button>
+        <button class="btn-complete" id="completeBtn">循签蹈矩</button>
         <button class="btn-clear" id="clearBtn">清空签筒</button>
-        <button class="btn-complete" id="completeBtn">完成</button>
       </div>
       
       <div class="result-container">
@@ -474,7 +474,7 @@ button:hover {
 // 存储键
 const STORAGE_KEY = 'todo_calendar_data';
 const COMPLETE_TIME_KEY = 'todo_complete_time';
-const TAGS_STORAGE_KEY = 'todo_tags';  // 新增：用于保存待办任务签
+const TAGS_STORAGE_KEY = 'todo_tags';  // 用于保存待办任务签
 
 let currentTodo = '';
 let currentDate = getTodayDate();
@@ -571,7 +571,6 @@ function addBatchTasks(inputText) {
   if (raw === '') return;
   
   // 使用正则分割：空格、英文逗号、中文逗号、斜杠
-  // 支持多种分隔符混合
   const parts = raw.split(/[ ,，/]+/).filter(p => p.trim() !== '');
   
   for (let part of parts) {
