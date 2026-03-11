@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>A娃你就抽签吧 - 点击签直接抽中</title>
+<title>A娃你就抽签吧 - 点击签直接抽中 + 计时格子</title>
 <style>
 * {
   margin: 0;
@@ -215,7 +215,42 @@ h2 {
   align-items: center;
   justify-content: center;
   min-height: 0;
+  width: 100%;
 }
+
+/* 格子计时器 - 放在按钮上方 */
+.grid-timer {
+  display: flex;
+  gap: 4px;                /* 减小间隙 */
+  justify-content: center;
+  margin-bottom: 20px;
+  width: 100%;
+  flex-wrap: nowrap;       /* 强制不换行 */
+  overflow-x: auto;        /* 若实在放不下则出现滚动条 */
+  padding: 2px 0;
+}
+.grid-cell {
+  width: 20px;             /* 减小尺寸 */
+  height: 20px;
+  background-color: #f0f0f0;
+  border-radius: 4px;      /* 圆角稍微调小 */
+  transition: background 0.3s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  flex-shrink: 0;          /* 防止压缩 */
+}
+/* 半分钟状态：左半绿右半灰 */
+.grid-cell.half {
+  background: linear-gradient(to right, #c7e9c7 50%, #f0f0f0 50%);
+}
+/* 满一分钟状态：全绿渐变（低饱和度） */
+.grid-cell.full {
+  background: linear-gradient(145deg, #c7e9c7, #b8e0e6);
+}
+/* 全亮后深绿（低饱和度） */
+.grid-cell.completed {
+  background: linear-gradient(145deg, #9fc7b0, #8fb7b7);
+}
+
 .btn-group {
   display: flex;
   gap: 10px;
@@ -462,10 +497,13 @@ button:hover {
     </div>
   </div>
 
-  <!-- 中栏：抽签 -->
+  <!-- 中栏：抽签 + 格子计时器 -->
   <div class="card">
     <h2>🔮 就你，过来抽个签</h2>
     <div class="draw-area">
+      <!-- 格子计时器放在按钮上方 -->
+      <div class="grid-timer" id="gridTimer" style="display: none;"></div>
+      
       <div class="btn-group">
         <button id="drawBtn">开始抽签</button>
         <button class="btn-complete" id="completeBtn">循签蹈矩</button>
@@ -479,7 +517,7 @@ button:hover {
     </div>
   </div>
 
-  <!-- 右栏：日历 -->
+  <!-- 右栏：日历 + 明细（含开始/结束时间） -->
   <div class="card">
     <h2>🙀 做了这么多，蒸蚌！</h2>
     <div style="display: flex; margin-bottom: 4px; flex-shrink:0; align-items: center;">
@@ -500,7 +538,7 @@ button:hover {
     <button class="btn-export" id="exportBtn">导出已办事项</button>
 
     <div class="record-box">
-      <h4>当日完成明细</h4>
+      <h4>当日完成明细（开始→结束）</h4>
       <div class="record-list" id="recordList">请选择日期查看</div>
     </div>
   </div>
@@ -508,11 +546,16 @@ button:hover {
 
 <script>
 // 存储键
-const STORAGE_KEY = 'todo_calendar_data';
-const COMPLETE_TIME_KEY = 'todo_complete_time';
+const STORAGE_KEY = 'todo_calendar_data';               // 仅存储任务名列表，用于日历标记
+const COMPLETED_DETAIL_KEY = 'completed_tasks_detail';   // 存储完整记录 { date, task, start, end }
 const TAGS_STORAGE_KEY = 'todo_tags';
 
-let currentTodo = '';
+let currentTodo = '';                // 当前抽中的任务文本
+let currentStartTime = '';           // 当前任务的开始时间（抽中时刻）
+let timerInterval = null;            // 计时器句柄
+let gridCells = 0;                   // 当前已点亮格子数 (0-12)
+const MAX_GRID = 12;
+
 let currentDate = getTodayDate();
 
 function getTodayDate() {
@@ -525,6 +568,7 @@ function getCurrentTime() {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
 }
 
+// 获取仅包含任务名的日历数据（用于日历标记）
 function getData() {
   const data = localStorage.getItem(STORAGE_KEY);
   return data ? JSON.parse(data) : {};
@@ -532,12 +576,14 @@ function getData() {
 function saveData(data) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
-function getCompleteTimeData() {
-  const data = localStorage.getItem(COMPLETE_TIME_KEY);
-  return data ? JSON.parse(data) : {};
+
+// 获取完整完成记录（新）
+function getCompletedDetails() {
+  const data = localStorage.getItem(COMPLETED_DETAIL_KEY);
+  return data ? JSON.parse(data) : [];
 }
-function saveCompleteTimeData(data) {
-  localStorage.setItem(COMPLETE_TIME_KEY, JSON.stringify(data));
+function saveCompletedDetails(details) {
+  localStorage.setItem(COMPLETED_DETAIL_KEY, JSON.stringify(details));
 }
 
 // ======================
@@ -574,14 +620,21 @@ function loadTagsFromStorage() {
   renderTags();
 }
 
-// 新增：点击左端按钮直接抽中该任务
+// 抽中特定任务（记录开始时间，启动格子计时）
 function drawSpecificTask(taskText) {
   if (!taskText) return;
   
+  // 如果已经有计时任务，先清除
+  resetTimerAndGrid();
+
   currentTodo = taskText;
+  currentStartTime = getCurrentTime();  // 记录开始时间
   showDrawAnimation(`✅ 抽中：${currentTodo}`);
   
-  // 添加一点动画效果，让被选中的标签闪烁一下
+  // 启动格子计时
+  startGridTimer();
+
+  // 让被选中的标签闪烁
   const tags = document.querySelectorAll('.todo-tag');
   tags.forEach(tag => {
     const textEl = tag.querySelector('.todo-tag-text');
@@ -603,7 +656,6 @@ function renderTags() {
     const div = document.createElement('div');
     div.className = 'todo-tag';
     div.style.backgroundColor = item.color;
-    div.style.borderLeftColor = '#409eff';
     
     // 左端抽签按钮
     const drawBtn = document.createElement('div');
@@ -681,13 +733,94 @@ function removeTodo(text) {
 }
 
 // ======================
-// 抽签动画
+// 格子计时器相关
 // ======================
+const gridTimerDiv = document.getElementById('gridTimer');
 const drawStick = document.getElementById('drawStick');
 const emptyTip = document.getElementById('emptyTip');
 const datePicker = document.getElementById('datePicker');
 datePicker.value = currentDate;
 
+// 初始化格子显示
+function initGridCells() {
+  gridTimerDiv.innerHTML = '';
+  gridTimerDiv.style.display = 'flex';
+  for (let i = 0; i < MAX_GRID; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'grid-cell';
+    gridTimerDiv.appendChild(cell);
+  }
+}
+
+// 更新格子状态（基于已过分钟数和半分钟标记）
+function updateGridCells(elapsedMinutes, halfFlag) {
+  const cells = document.querySelectorAll('.grid-cell');
+  cells.forEach((cell, index) => {
+    cell.classList.remove('half', 'full', 'completed');
+    if (index < elapsedMinutes) {
+      // 已经整分钟点亮的格子：全绿
+      cell.classList.add('full');
+    } else if (index === elapsedMinutes && halfFlag) {
+      // 当前分钟的半分钟状态：半绿
+      cell.classList.add('half');
+    }
+  });
+  // 如果全亮，添加 completed 类（深绿）
+  if (elapsedMinutes >= MAX_GRID) {
+    cells.forEach(cell => {
+      cell.classList.remove('half', 'full');
+      cell.classList.add('completed');
+    });
+  }
+}
+
+// 开始计时
+function startGridTimer() {
+  if (timerInterval) clearInterval(timerInterval);
+  
+  // 重置格子
+  gridCells = 0;
+  initGridCells();
+  updateGridCells(0, false);
+  
+  const startTimestamp = Date.now();
+  
+  timerInterval = setInterval(() => {
+    const elapsedMs = Date.now() - startTimestamp;
+    const elapsedMinutes = Math.floor(elapsedMs / 60000);
+    const halfFlag = (elapsedMs % 60000) >= 30000; // 半分钟标记
+
+    if (elapsedMinutes >= MAX_GRID) {
+      // 达到12分钟，全亮并变深绿，然后自动重置
+      updateGridCells(MAX_GRID, false); // 全亮深绿
+      clearInterval(timerInterval);
+      timerInterval = null;
+      
+      // 自动清除当前任务（不保存）
+      setTimeout(() => {
+        resetTimerAndGrid();
+        showDrawAnimation('⏳ 计时结束，任务已超时');
+        currentTodo = '';
+        currentStartTime = '';
+      }, 500);
+    } else {
+      updateGridCells(elapsedMinutes, halfFlag);
+    }
+  }, 500); // 每500ms更新一次，保证半分钟效果
+}
+
+// 重置计时器和格子
+function resetTimerAndGrid() {
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+  gridTimerDiv.style.display = 'none';
+  gridTimerDiv.innerHTML = '';
+  gridCells = 0;
+}
+
+// 显示抽签结果（动画）
 function showDrawAnimation(text) {
   emptyTip.style.display = 'none';
   drawStick.textContent = text;
@@ -698,17 +831,21 @@ function hideDrawStick() {
   emptyTip.style.display = 'block';
 }
 
+// ======================
+// 抽签按钮事件
+// ======================
 document.getElementById('drawBtn').addEventListener('click', () => {
   const list = getTodoArray();
   if (!list.length) {
     hideDrawStick();
     emptyTip.textContent = '签桶已空！';
+    resetTimerAndGrid();
     currentTodo = '';
+    currentStartTime = '';
     return;
   }
   const idx = Math.floor(Math.random() * list.length);
-  currentTodo = list[idx];
-  showDrawAnimation(`✅ 抽中：${currentTodo}`);
+  drawSpecificTask(list[idx]);
 });
 
 document.getElementById('clearBtn').addEventListener('click', () => {
@@ -717,69 +854,79 @@ document.getElementById('clearBtn').addEventListener('click', () => {
   saveTagsToStorage();
   hideDrawStick();
   emptyTip.textContent = '抽签结果将显示在这里';
+  resetTimerAndGrid();
   currentTodo = '';
+  currentStartTime = '';
 });
 
+// 完成任务
 document.getElementById('completeBtn').addEventListener('click', () => {
   if (!currentTodo) {
     alert('请先抽取一个待办！');
     return;
   }
-  const taskName = currentTodo.replace('✅ 抽中：', '');
-  const completeTime = getCurrentTime();
-
+  
+  const endTime = getCurrentTime();
+  
+  // 保存完成记录（含开始和结束）
+  const completedDetails = getCompletedDetails();
+  completedDetails.push({
+    date: currentDate,
+    task: currentTodo,
+    start: currentStartTime,
+    end: endTime
+  });
+  saveCompletedDetails(completedDetails);
+  
+  // 同时保存到原有日历数据（只存任务名，用于标记）
   const data = getData();
   if (!data[currentDate]) data[currentDate] = [];
-  data[currentDate].push(taskName);
+  data[currentDate].push(currentTodo);
   saveData(data);
-
-  const timeData = getCompleteTimeData();
-  if (!timeData[currentDate]) timeData[currentDate] = {};
-  if (!timeData[currentDate][taskName]) {
-    timeData[currentDate][taskName] = completeTime;
-  }
-  saveCompleteTimeData(timeData);
-
-  removeTodo(taskName);
+  
+  // 从签筒中移除该任务
+  removeTodo(currentTodo);
+  
+  // 重置计时器和当前任务
+  resetTimerAndGrid();
   hideDrawStick();
   emptyTip.textContent = '已完成并移除该签，可继续抽签';
   currentTodo = '';
+  currentStartTime = '';
+  
+  // 刷新日历和记录
   renderCalendar();
   showRecord(currentDate);
 });
 
 // ======================
-// 导出
+// 导出（使用新存储）
 // ======================
 document.getElementById('exportBtn').addEventListener('click', () => {
   const start = document.getElementById('exportStart').value;
   const end = document.getElementById('exportEnd').value;
-  const todoData = getData();
-  const timeData = getCompleteTimeData();
+  const details = getCompletedDetails();
 
-  if (Object.keys(todoData).length === 0) {
+  if (details.length === 0) {
     alert('暂无已完成事项可导出！');
     return;
   }
 
-  const dates = Object.keys(todoData).sort();
-  let filteredDates = dates;
+  // 按日期排序
+  let filtered = details;
   if (start && end) {
-    filteredDates = dates.filter(d => d >= start && d <= end);
+    filtered = details.filter(item => item.date >= start && item.date <= end);
   }
-  if (filteredDates.length === 0) {
+  if (filtered.length === 0) {
     alert('该时间段内无数据');
     return;
   }
 
-  let csv = '日期,时间,任务\n';
-  filteredDates.forEach(date => {
-    const tasks = todoData[date] || [];
-    tasks.forEach(task => {
-      const t = timeData[date]?.[task] || '未知时间';
-      const safe = task.replace(/,/g, '，');
-      csv += `${date},${t},${safe}\n`;
-    });
+  // 生成 CSV，包含开始时间和结束时间
+  let csv = '日期,任务,开始时间,结束时间\n';
+  filtered.forEach(item => {
+    const safeTask = item.task.replace(/,/g, '，');
+    csv += `${item.date},${safeTask},${item.start},${item.end}\n`;
   });
 
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -787,16 +934,16 @@ document.getElementById('exportBtn').addEventListener('click', () => {
   const a = document.createElement('a');
   a.href = url;
   const suffix = (start && end) ? `_${start}_to_${end}` : '_全部';
-  a.download = `已办事项${suffix}.csv`;
+  a.download = `已完成任务明细${suffix}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  alert('导出成功！可用 Excel 打开');
+  alert('导出成功！包含开始和结束时间');
 });
 
 // ======================
-// 日历渲染
+// 日历渲染（使用原有数据标记，但记录显示使用新存储）
 // ======================
 document.getElementById('jumpDate').addEventListener('click', () => {
   if (datePicker.value) {
@@ -822,7 +969,7 @@ function renderCalendar() {
     box.appendChild(emptyDiv);
   }
 
-  const data = getData();
+  const data = getData(); // 仅用于标记是否有任务
   for (let d = 1; d <= lastDay.getDate(); d++) {
     const dateStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     const el = document.createElement('div');
@@ -843,19 +990,26 @@ function renderCalendar() {
   }
 }
 
+// 显示当天完成记录（从新存储读取）
 function showRecord(date) {
   const listEl = document.getElementById('recordList');
-  const list = getData()[date] || [];
-  const timeData = getCompleteTimeData()[date] || {};
-  if (list.length === 0) {
+  const details = getCompletedDetails();
+  const dayRecords = details.filter(item => item.date === date);
+  
+  if (dayRecords.length === 0) {
     listEl.innerHTML = '当天暂无完成事项';
     return;
   }
-  listEl.innerHTML = list.map((item, i) =>
-    `<div class="record-item">${i+1}. ${item} <small>(${timeData[item] || '未知时间'})</small></div>`
+  
+  // 按结束时间排序（假设结束时间晚于开始）
+  dayRecords.sort((a, b) => (a.end > b.end ? 1 : -1));
+  
+  listEl.innerHTML = dayRecords.map((item, i) => 
+    `<div class="record-item">${i+1}. ${item.task} <small>开始:${item.start} 结束:${item.end}</small></div>`
   ).join('');
 }
 
+// 页面初始化
 window.onload = () => {
   loadTagsFromStorage();
   renderCalendar();
